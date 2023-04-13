@@ -13,7 +13,7 @@
 //
 //[iCal/notioncsv]
 //iCalはカレンダーにインポート可能な形式で出力する
-//notioncsvはnotionにインポート可能なcsv形式で出力する
+//notionはnotionにインポートする
 //省略可能で、デフォルトはiCalになる
 
 //////////////////////////////////////////////////////////////////////////
@@ -21,6 +21,9 @@
 const fs = require('fs');
 const iconv = require('iconv-lite');
 const {parse} = require('csv-parse/sync');
+const notion = require('./notion.js');
+const { setTimeout } = require('timers/promises');
+
 
 function getiCalTime(date)
 {
@@ -58,7 +61,7 @@ let exportType = 0;
 if(process.argv[3] == 1) {
   calType = 1;
 }
-if(process.argv[4] == "notioncsv") {
+if(process.argv[4] == "notion") {
   exportType = 1;
 }
 
@@ -114,16 +117,46 @@ function createEventCal(evt, day)
   //LAST-MODIFIED:20230320T155912Z
 }
 
-function createNotionCSV(evt, day)
+async function createNotion(evt, day)
 {
   let startTime = mergeDate(day, evt.start);
   let endTime = mergeDate(day, evt.end);
   let summary = evt.summary;
   
-  output += `${startTime},`;     //開始時間
-  output += `${endTime},`;       //終了時間
-  output += `${evt.location},`;  //場所
-  output += `${summary}\n`;      //内容
+  let pageData = {
+    "parent": {
+      "database_id": "fdd978f86b1241e684fd9aa756131b98"
+    },
+    "properties": {
+      "授業": {
+        "title": [
+          {
+            "text": {
+              "content": summary
+            }
+          }
+        ]
+      },
+      "クラス": {
+        "select": {
+          "name" : className
+        }
+      },
+      "場所": {
+        "select": {
+          "name" : evt.location
+        }
+      },
+      "日時": {
+        "date": {
+          "start": startTime.toISOString(),
+          "end": endTime.toISOString()
+        }
+      }
+    }
+  };
+  
+  await notion.createPage(pageData);
 }
 
 //作業用配列
@@ -173,6 +206,7 @@ for (const record of classCsv) {
   lastTimes = record[1].split("-");
 }
 
+(async() => {
 //日程ごとにカレンダーを作る
 week=0;
 let interval={};
@@ -226,7 +260,8 @@ for (const record of dateCsv)
     }
     if(exportType == 1)
     {
-      createNotionCSV(e, record[1]);
+      await setTimeout(200);
+      await createNotion(e, record[1]);
     }
   }
   week++;
@@ -235,14 +270,9 @@ for (const record of dateCsv)
 if(exportType == 0)
 {
   output += "END:VCALENDAR\n";                  //カレンダーおわり(変えない事)
+  fs.writeFileSync(outTitle,output);
 }
-
-if(exportType == 1)
-{
-//  output = iconv.encode(output, "SJIS");
-}
-
-fs.writeFileSync(outTitle,output);
+})();
 
 
 //授業日程csv
