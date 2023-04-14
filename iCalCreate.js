@@ -260,7 +260,7 @@ for (const record of dateCsv)
     }
     if(exportType == 1)
     {
-      await setTimeout(200);
+      await setTimeout(100);
       await createNotion(e, record[1]);
     }
   }
